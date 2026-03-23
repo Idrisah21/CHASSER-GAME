@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chess Game vs Alpha-Beta AI</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #eee;
+    }
+    #chessboard {
+      display: grid;
+      grid-template-columns: repeat(8, 60px);
+      grid-template-rows: repeat(8, 60px);
+      border: 2px solid #333;
+    }
+    .square {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 36px;
+      cursor: pointer;
+    }
+    .light { background: #f0d9b5; }
+    .dark { background: #b58863; }
+  </style>
+</head>
+<body>
+  <div id="chessboard"></div>
+
+  <!-- Load chess.js for rules -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+  <script>
+    const board = document.getElementById("chessboard");
+    const pieces = {
+      r: "♜", n: "♞", b: "♝", q: "♛", k: "♚", p: "♟",
+      R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔", P: "♙"
+    };
+
+    const game = new Chess();
+
+    function drawBoard() {
+      board.innerHTML = "";
+      const position = game.fen().split(" ")[0];
+      const rows = position.split("/");
+      for (let row = 0; row < 8; row++) {
+        let col = 0;
+        for (const char of rows[row]) {
+          if (isNaN(char)) {
+            const square = createSquare(row, col, pieces[char]);
+            board.appendChild(square);
+            col++;
+          } else {
+            for (let i = 0; i < parseInt(char); i++) {
+              const square = createSquare(row, col, "");
+              board.appendChild(square);
+              col++;
+            }
+          }
+        }
+      }
+    }
+
+    function createSquare(row, col, piece) {
+      const square = document.createElement("div");
+      square.className = "square " + ((row + col) % 2 === 0 ? "light" : "dark");
+      square.dataset.row = row;
+      square.dataset.col = col;
+      square.textContent = piece;
+      square.addEventListener("click", selectSquare);
+      return square;
+    }
+
+    let selected = null;
+    function selectSquare(e) {
+      const row = parseInt(e.target.dataset.row);
+      const col = parseInt(e.target.dataset.col);
+      const squareName = "abcdefgh"[col] + (8 - row);
+
+      if (selected) {
+        const move = { from: selected, to: squareName };
+        if (game.move(move)) {
+          drawBoard();
+          setTimeout(aiMove, 500);
+        }
+        selected = null;
+      } else {
+        selected = squareName;
+      }
+    }
+
+    // Piece values
+    const pieceValues = {
+      p: 1, n: 3, b: 3, r: 5, q: 9, k: 100,
+      P: -1, N: -3, B: -3, R: -5, Q: -9, K: -100
+    };
+
+    function evaluateBoard(board) {
+      let value = 0;
+      for (let row of board) {
+        for (let square of row) {
+          if (square) value += pieceValues[square.type] || 0;
+        }
+      }
+      return value;
+    }
+
+    // Minimax with alpha-beta pruning
+    function minimax(depth, game, alpha, beta, isMaximizing) {
+      if (depth === 0 || game.game_over()) {
+        return evaluateBoard(game.board());
+      }
+
+      const moves = game.moves();
+      if (isMaximizing) {
+        let maxEval = -Infinity;
+        for (let move of moves) {
+          game.move(move);
+          let eval = minimax(depth - 1, game, alpha, beta, false);
+          game.undo();
+          maxEval = Math.max(maxEval, eval);
+          alpha = Math.max(alpha, eval);
+          if (beta <= alpha) break; // prune
+        }
+        return maxEval;
+      } else {
+        let minEval = Infinity;
+        for (let move of moves) {
+          game.move(move);
+          let eval = minimax(depth - 1, game, alpha, beta, true);
+          game.undo();
+          minEval = Math.min(minEval, eval);
+          beta = Math.min(beta, eval);
+          if (beta <= alpha) break; // prune
+        }
+        return minEval;
+      }
+    }
+
+    function aiMove() {
+      if (game.game_over()) return;
+      const moves = game.moves();
+      let bestMove = null;
+      let bestValue = -Infinity;
+
+      for (let move of moves) {
+        game.move(move);
+        let value = minimax(3, game, -Infinity, Infinity, false); // depth 3
+        game.undo();
+        if (value > bestValue) {
+          bestValue = value;
+          bestMove = move;
+        }
+      }
+
+      if (bestMove) {
+        game.move(bestMove);
+        drawBoard();
+      }
+    }
+
+    drawBoard();
+  </script>
+</body>
+</html>
